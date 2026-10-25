@@ -1,0 +1,314 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Cámara Pro</title>
+<style>
+:root{color-scheme:dark;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px);--y:#ffd60a;--g:#2a2a2c}
+html,body{height:100%;margin:0;background:#000;color:#fff;font-family:-apple-system,"Segoe UI",Roboto,sans-serif;overflow:hidden}
+#app{height:100%;display:flex;flex-direction:column}
+button{font:inherit;color:inherit;border:0;cursor:pointer;background:none}
+#top{display:flex;gap:6px;justify-content:center;padding:8px;flex-wrap:wrap}
+.chip{background:var(--g);padding:6px 12px;border-radius:16px;font-size:13px;font-weight:600}
+.chip.on{background:var(--y);color:#000}
+#stage{flex:1;position:relative;min-height:0;overflow:hidden}
+video{width:100%;height:100%;object-fit:contain;background:#000}
+video.mirror{transform:scaleX(-1)}
+#gridl{position:absolute;inset:0;pointer-events:none;display:none;background:linear-gradient(#fff4,#fff4) 33.3%/1px 100% no-repeat,linear-gradient(#fff4,#fff4) 66.6%/1px 100% no-repeat,linear-gradient(#fff4,#fff4) 0 33.3%/100% 1px no-repeat,linear-gradient(#fff4,#fff4) 0 66.6%/100% 1px no-repeat}
+#info{position:absolute;top:8px;left:8px;font-size:12px;background:#0008;padding:3px 8px;border-radius:8px}
+#rec{position:absolute;top:8px;right:8px;background:#e5252a;padding:3px 10px;border-radius:8px;font-size:13px;display:none}
+#count{position:absolute;inset:0;display:none;align-items:center;justify-content:center;font-size:110px;font-weight:200;text-shadow:0 0 20px #000;pointer-events:none}
+#busy{position:absolute;inset:0;display:none;align-items:center;justify-content:center;background:#000a;font-size:16px;text-align:center;padding:20px}
+#sflash{position:absolute;inset:0;background:#fff;display:none;z-index:3}
+#hint{position:absolute;bottom:46px;left:50%;transform:translateX(-50%);background:#000b;padding:6px 14px;border-radius:14px;font-size:14px;display:none;pointer-events:none;z-index:2;white-space:nowrap}
+#zoomRow{position:absolute;bottom:8px;left:20%;width:60%;display:none}
+#zoomRow input{width:100%}
+#msg{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:14px;text-align:center;padding:24px;background:#000;z-index:4}
+.primary{background:#fff;color:#000;padding:12px 24px;border-radius:24px;font-weight:600}
+#modes{display:flex;gap:6px;justify-content:center;padding:6px;background:#000}
+#modes button{padding:6px 14px;border-radius:16px;color:#aaa;font-weight:700;font-size:14px}
+#modes button.on{color:var(--y);background:var(--g)}
+#bar{display:flex;align-items:center;justify-content:space-around;padding:10px 10px 16px}
+.side{width:52px;height:52px;border-radius:50%;background:var(--g);font-size:22px;display:flex;align-items:center;justify-content:center;overflow:hidden;padding:0}
+.side img{width:100%;height:100%;object-fit:cover}
+#shutter{width:72px;height:72px;border-radius:50%;background:#fff;border:4px solid #000;box-shadow:0 0 0 3px #fff}
+#shutter.recording{background:#e5252a}
+#panel{position:absolute;left:0;right:0;bottom:0;background:#1c1c1ee8;border-radius:20px 20px 0 0;padding:14px 16px 18px;display:none;z-index:5;max-height:70%;overflow:auto}
+#panel h4{margin:0 0 8px}
+.row{display:flex;justify-content:space-between;align-items:center;padding:8px 0;border-bottom:1px solid #333;font-size:14px}
+.row input[type=range]{width:50%}
+#gal,#view{position:absolute;inset:0;background:#000;display:none;flex-direction:column;z-index:6}
+#gal header,#view header{display:flex;justify-content:space-between;align-items:center;padding:10px 14px}
+#grid{flex:1;overflow:auto;display:grid;grid-template-columns:repeat(auto-fill,minmax(100px,1fr));gap:3px;padding:3px;align-content:start}
+.it{aspect-ratio:1;background:#222;position:relative}
+.it img,.it video{width:100%;height:100%;object-fit:cover}
+.it span{position:absolute;right:4px;bottom:3px;font-size:12px}
+#vbody{flex:1;min-height:0;display:flex;align-items:center;justify-content:center}
+#vbody img,#vbody video{max-width:100%;max-height:100%}
+#vact{display:flex;justify-content:space-around;padding:12px}
+#vact button{padding:10px 18px;border-radius:20px;background:var(--g)}
+</style>
+</head>
+<body>
+<div id="app">
+  <div id="top">
+    <button class="chip" id="cTorch">⚡ Flash</button>
+    <button class="chip on" id="cStab">🧘 Estabilizar</button>
+    <button class="chip" id="cHdr">HDR</button>
+    <button class="chip on" id="cIph">iPhone</button>
+    <button class="chip" id="cTimer">⏱ Off</button>
+    <button class="chip" id="cGrid">▦ Cuadrícula</button>
+    <button class="chip" id="cSet">⚙ Selfie</button>
+  </div>
+  <div id="stage">
+    <video id="v" autoplay playsinline muted></video>
+    <div id="gridl"></div><div id="info"></div><div id="rec">● 00:00</div><div id="count"></div>
+    <div id="zoomRow"><input id="zoom" type="range"></div>
+    <div id="hint"></div><div id="busy"></div><div id="sflash"></div>
+    <div id="panel">
+      <h4>Ajustes de selfie</h4>
+      <div class="row">Espejo en vista previa<button class="chip on" id="sMirP">Sí</button></div>
+      <div class="row">Guardar foto espejada<button class="chip" id="sMirS">No</button></div>
+      <div class="row">Flash de pantalla<button class="chip on" id="sSF">Sí</button></div>
+      <div class="row">Piel suave (selfie)<input type="range" id="sSm" min="0" max="100" value="35"></div>
+      <div class="row">Calidad JPEG<input type="range" id="sQ" min="70" max="100" value="97"></div>
+      <div style="text-align:right;padding-top:10px"><button class="primary" id="pClose" style="padding:8px 20px">Listo</button></div>
+    </div>
+    <div id="msg"><div style="font-size:48px">📷</div><div>Para usar la cámara necesitamos tu permiso.</div><button class="primary" id="start">Activar cámara</button><div id="err" style="color:#ff6b6b;font-size:14px;max-width:320px"></div></div>
+    <div id="gal"><header><b>Galería</b><button class="primary" id="gClose" style="padding:6px 16px">Cerrar</button></header><div id="grid"></div></div>
+    <div id="view"><header><button class="chip" id="vBack">← Volver</button><b id="vN"></b><span></span></header><div id="vbody"></div><div id="vact"><button id="vPrev">◀</button><button id="vSave">⬇ Guardar</button><button id="vDel">🗑 Borrar</button><button id="vNext">▶</button></div></div>
+  </div>
+  <div id="modes"><button id="mPhoto" class="on">FOTO</button><button id="mNight">NOCHE</button><button id="mVideo">VIDEO</button></div>
+  <div id="bar">
+    <button class="side" id="thumb" aria-label="Galería">🖼</button>
+    <button id="shutter" aria-label="Disparador"></button>
+    <button class="side" id="flip" aria-label="Cambiar cámara">🔄</button>
+  </div>
+</div>
+<script>
+const $=id=>document.getElementById(id),v=$('v'),sleep=ms=>new Promise(r=>setTimeout(r,ms));
+const S={hdr:false,iph:true,stab:true,grid:false,timer:0,torch:false,mirP:true,mirS:false,sf:true,sm:35,q:.97};
+let stream,facing='environment',mode='photo',recorder,chunks=[],timer,t0,items=[],vi=0,busy=false,delArm=false;
+const PX_MULTI=8e6; // HDR y noche (varios cuadros)
+let ic=null,icMax=null;
+const pxPhoto=()=>ic?16e6:12.5e6;
+
+/* ---------- Cámara ---------- */
+async function open(){
+  $('err').textContent='';
+  if(!navigator.mediaDevices||!navigator.mediaDevices.getUserMedia){$('err').textContent='Tu navegador no permite la cámara (se requiere HTTPS).';return}
+  if(stream)stream.getTracks().forEach(t=>t.stop());
+  const vid=mode==='video';
+  const base={facingMode:{ideal:facing},width:{ideal:vid?1920:4032},height:{ideal:vid?1080:3024},frameRate:vid?{ideal:60,min:30}:{ideal:30},resizeMode:{ideal:'none'}};
+  try{stream=await navigator.mediaDevices.getUserMedia({video:base,audio:vid})}
+  catch(e){try{stream=await navigator.mediaDevices.getUserMedia({video:base,audio:false})}
+  catch(e2){$('err').textContent=e2.name==='NotAllowedError'?'Permiso denegado. Habilita la cámara en el navegador y reintenta.':'No se pudo abrir la cámara: '+e2.name;$('msg').style.display='flex';return}}
+  const tr=stream.getVideoTracks()[0];
+  try{await tr.applyConstraints({advanced:[{focusMode:'continuous'},{exposureMode:'continuous'},{whiteBalanceMode:'continuous'}]})}catch(e){}
+  v.srcObject=stream;applyMirror();$('msg').style.display='none';
+  ic=null;icMax=null;
+  if(!vid&&'ImageCapture' in window){try{ic=new ImageCapture(tr);const pc=await ic.getPhotoCapabilities();if(pc&&pc.imageWidth&&pc.imageHeight)icMax={w:pc.imageWidth.max,h:pc.imageHeight.max}}catch(e){icMax=null}}
+  const s=tr.getSettings();$('info').textContent=`${s.width}×${s.height} · ${Math.round(s.frameRate||0)} fps`+(icMax?` · foto ${icMax.w}×${icMax.h}`:'');
+  const c=tr.getCapabilities?tr.getCapabilities():{},z=$('zoom');
+  if(c.zoom){z.min=c.zoom.min;z.max=c.zoom.max;z.step=c.zoom.step||.1;z.value=s.zoom||c.zoom.min;$('zoomRow').style.display='block';z.oninput=()=>tr.applyConstraints({advanced:[{zoom:+z.value}]}).catch(()=>{})}else $('zoomRow').style.display='none';
+  $('cTorch').style.display=(c.torch||facing==='environment')?'':'none';
+}
+function applyMirror(){v.classList.toggle('mirror',facing==='user'&&S.mirP)}
+$('start').onclick=()=>{motionPerm();open()};
+$('flip').onclick=()=>{if(recorder)return;facing=facing==='user'?'environment':'user';S.torch=false;$('cTorch').classList.remove('on');open()};
+
+/* ---------- Chips ---------- */
+const tog=(id,k,fn)=>$(id).onclick=()=>{S[k]=!S[k];$(id).classList.toggle('on',S[k]);fn&&fn()};
+tog('cStab','stab');tog('cHdr','hdr');tog('cIph','iph');tog('cGrid','grid',()=>$('gridl').style.display=S.grid?'block':'none');
+$('cIph').classList.toggle('on',S.iph);$('cStab').classList.toggle('on',S.stab);
+tog('cTorch','torch',()=>{stream&&stream.getVideoTracks()[0].applyConstraints({advanced:[{torch:S.torch}]}).catch(()=>{$('info').textContent='Flash no disponible en esta cámara'})});
+$('cTimer').onclick=()=>{S.timer=S.timer===0?3:S.timer===3?10:0;$('cTimer').textContent='⏱ '+(S.timer?S.timer+'s':'Off');$('cTimer').classList.toggle('on',!!S.timer)};
+$('cSet').onclick=()=>$('panel').style.display='block';$('pClose').onclick=()=>$('panel').style.display='none';
+tog('sMirP','mirP',()=>{$('sMirP').textContent=S.mirP?'Sí':'No';applyMirror()});
+tog('sMirS','mirS',()=>$('sMirS').textContent=S.mirS?'Sí':'No');
+tog('sSF','sf',()=>$('sSF').textContent=S.sf?'Sí':'No');
+$('sSm').oninput=e=>S.sm=+e.target.value;$('sQ').oninput=e=>S.q=e.target.value/100;
+function setMode(m){if(recorder||busy)return;const re=(m==='video')!==(mode==='video');mode=m;
+  ['Photo','Night','Video'].forEach(n=>$('m'+n).classList.toggle('on',m===n.toLowerCase()));
+  if(re&&stream)open()}
+$('mPhoto').onclick=()=>setMode('photo');$('mNight').onclick=()=>setMode('night');$('mVideo').onclick=()=>setMode('video');
+
+/* ---------- Estabilizador (sensor de movimiento) ---------- */
+const sc=document.createElement('canvas');sc.width=48;sc.height=36;const sx=sc.getContext('2d',{willReadFrequently:true});
+let lastG=null,shake=0,rot=0,gyro=false,motionAsked=false;
+setInterval(()=>{if(!stream||!v.videoWidth)return;sx.drawImage(v,0,0,48,36);const d=sx.getImageData(0,0,48,36).data,g=new Uint8Array(1728);let s=0;
+  for(let i=0,p=0;i<1728;i++,p+=4){g[i]=(d[p]*77+d[p+1]*150+d[p+2]*29)>>8;if(lastG)s+=Math.abs(g[i]-lastG[i])}
+  if(lastG)shake=shake*.4+(s/1728)*.6;lastG=g},70);
+window.addEventListener('devicemotion',e=>{const r=e.rotationRate;if(r&&r.alpha!=null){gyro=true;rot=rot*.6+Math.hypot(r.alpha,r.beta,r.gamma)*.4}});
+function motionPerm(){try{if(!motionAsked&&window.DeviceMotionEvent&&DeviceMotionEvent.requestPermission){motionAsked=true;DeviceMotionEvent.requestPermission().catch(()=>{})}}catch(e){}}
+async function steady(max){const t=Date.now();let ok=0;
+  while(Date.now()-t<max){const calm=(!gyro||rot<14)&&shake<3.2;ok=calm?ok+1:0;if(ok>=2)break;await sleep(70)}}
+
+/* ---------- Utilidades de imagen ---------- */
+function toCanvas(src,maxPx){const w0=src.videoWidth||src.width,h0=src.videoHeight||src.height,s=Math.min(1,Math.sqrt(maxPx/(w0*h0)));
+  const c=document.createElement('canvas');c.width=Math.round(w0*s);c.height=Math.round(h0*s);const x=c.getContext('2d');x.imageSmoothingQuality='high';x.drawImage(src,0,0,c.width,c.height);return c}
+function scaleTo(c,W){let cur=c;
+  while(cur.width/2>=W){const n=document.createElement('canvas');n.width=cur.width>>1;n.height=cur.height>>1;const x=n.getContext('2d');x.imageSmoothingQuality='high';x.drawImage(cur,0,0,n.width,n.height);cur=n}
+  const h=Math.max(1,Math.round(c.height*W/c.width)),t=document.createElement('canvas');t.width=W;t.height=h;const x=t.getContext('2d');x.imageSmoothingQuality='high';x.drawImage(cur,0,0,W,h);return t}
+function lowpass(c,f,lumaOnly){const w=c.width,h=c.height,t=scaleTo(c,Math.max(2,Math.round(w/f))),b=document.createElement('canvas');b.width=w;b.height=h;
+  const x=b.getContext('2d');x.imageSmoothingEnabled=true;x.imageSmoothingQuality='high';x.drawImage(t,0,0,w,h);
+  const d=x.getImageData(0,0,w,h).data;if(!lumaOnly)return d;
+  const y=new Uint8ClampedArray(w*h);for(let i=0,p=0;i<y.length;i++,p+=4)y[i]=(d[p]*77+d[p+1]*150+d[p+2]*29)>>8;return y}
+function gray(c,W){W=Math.min(W,c.width);const t=scaleTo(c,W),h=t.height,d=t.getContext('2d').getImageData(0,0,W,h).data,g=new Uint8Array(W*h);let s=0,s2=0;
+  for(let i=0,p=0;i<g.length;i++,p+=4){const v=(d[p]*77+d[p+1]*150+d[p+2]*29)>>8;g[i]=v;s+=v;s2+=v*v}
+  const n=g.length,m=s/n,sd=Math.sqrt(Math.max(1,s2/n-m*m));return{g,W,h,m,k:1/sd}}
+const pyr=c=>[160,480,1440].map(W=>gray(c,W));
+function sharp(a){const W=a.W,H=a.h,g=a.g;let s=0,n=0;
+  for(let y=1;y<H-1;y++)for(let x=1;x<W-1;x++){const i=y*W+x,l=4*g[i]-g[i-1]-g[i+1]-g[i-W]-g[i+W];s+=l*l;n++}return s/n}
+function sad(a,b,dx,dy,st){const W=a.W,H=a.h,m=Math.round(W*.08);let s=0,n=0;
+  for(let y=m;y<H-m;y+=st){const r=y*W,r2=(y+dy)*W+dx;for(let x=m;x<W-m;x+=st){s+=Math.abs((a.g[r+x]-a.m)*a.k-(b.g[r2+x]-b.m)*b.k);n++}}return n?s/n:1e9}
+function align(rp,cp,fullW){let ex=0,ey=0,pw=rp[0].W; // alineación por pirámide (grueso → fino)
+  rp.forEach((a,i)=>{const b=cp[i];if(i){const f=a.W/pw;ex=Math.round(ex*f);ey=Math.round(ey*f)}pw=a.W;
+    const R=i?2:8,st=i===2?2:1;let bs=1e9,bx=ex,by=ey;
+    for(let dy=ey-R;dy<=ey+R;dy++)for(let dx=ex-R;dx<=ex+R;dx++){const q=sad(a,b,dx,dy,st);if(q<bs){bs=q;bx=dx;by=dy}}
+    ex=bx;ey=by});
+  const f=fullW/pw;return{dx:-ex*f,dy:-ey*f}}
+function shift(c,dx,dy){const n=document.createElement('canvas');n.width=c.width;n.height=c.height;const x=n.getContext('2d');x.drawImage(c,0,0);x.drawImage(c,Math.round(dx),Math.round(dy));return n}
+function blur3(m,w,h){const o=new Float32Array(m.length);
+  for(let y=0;y<h;y++)for(let x=0;x<w;x++){let s=0,k=0;for(let j=-1;j<=1;j++)for(let i=-1;i<=1;i++){const xx=x+i,yy=y+j;if(xx>=0&&yy>=0&&xx<w&&yy<h){s+=m[yy*w+xx];k++}}o[y*w+x]=s/k}return o}
+
+/* ---------- Captura ---------- */
+async function still(){ // foto a la máxima resolución del sensor
+  if(ic){try{const o={};if(icMax){o.imageWidth=icMax.w;o.imageHeight=icMax.h}
+    const bmp=await createImageBitmap(await ic.takePhoto(o));const c=toCanvas(bmp,pxPhoto());bmp.close&&bmp.close();return c}catch(e){ic=null}}
+  return toCanvas(v,pxPhoto())}
+async function bestShot(n,say){ // ráfaga corta y se queda con la más nítida
+  let best=null,bs=-1;
+  for(let i=0;i<n;i++){const c=await still(),q=sharp(gray(c,1440));if(q>bs){bs=q;best=c}
+    if(i<n-1){say(`Mantén firme… ${i+2}/${n}`);await sleep(80)}}
+  return best}
+async function nightShot(say){ // 8 cuadros alineados, se promedian para quitar ruido
+  const N=8;let ref=null,rp=null,b0=0,acc=null,cnt=0,w=0,h=0;
+  for(let i=0;i<N;i++){
+    if(i)await sleep(120);say(`Mantén firme… ${i+1}/${N}`);
+    let c=toCanvas(v,PX_MULTI);const P=pyr(c);
+    if(!ref){ref=c;rp=P;b0=sharp(P[2]);w=c.width;h=c.height;acc=new Uint16Array(w*h*3)}
+    else{if(sharp(P[2])<b0*.55)continue;const s=align(rp,P,c.width);c=shift(c,s.dx,s.dy)}
+    const d=c.getContext('2d').getImageData(0,0,w,h).data;
+    for(let j=0,k=0;j<d.length;j+=4,k+=3){acc[k]+=d[j];acc[k+1]+=d[j+1];acc[k+2]+=d[j+2]}cnt++}
+  const o=new Uint8ClampedArray(w*h*4);
+  for(let i=0,k=0,p=0;i<w*h;i++,k+=3,p+=4){o[p]=acc[k]/cnt;o[p+1]=acc[k+1]/cnt;o[p+2]=acc[k+2]/cnt;o[p+3]=255}
+  const c=document.createElement('canvas');c.width=w;c.height=h;c.getContext('2d').putImageData(new ImageData(o,w,h),0,0);return c}
+function fuse(cs){ // fusión de exposiciones natural (sin look plano)
+  const w=cs[0].width,h=cs[0].height,n=cs.length,f=8,lw=Math.ceil(w/f),lh=Math.ceil(h/f);
+  const Wm=cs.map(c=>{const t=scaleTo(c,lw),d=t.getContext('2d').getImageData(0,0,lw,t.height).data,m=new Float32Array(lw*lh);
+    for(let i=0,p=0;i<m.length&&p<d.length;i++,p+=4){const r=d[p],g=d[p+1],b=d[p+2],l=(r*.299+g*.587+b*.114)/255-.5,mx=Math.max(r,g,b),mn=Math.min(r,g,b);m[i]=Math.exp(-l*l/.08)*(.15+(mx-mn)/255)+1e-4}
+    return blur3(blur3(m,lw,lh),lw,lh)});
+  const D=cs.map(c=>c.getContext('2d').getImageData(0,0,w,h).data),o=new Uint8ClampedArray(w*h*4);
+  for(let y=0;y<h;y++){const fy=Math.min(lh-1.001,Math.max(0,(y+.5)/f-.5)),y0=fy|0,ty=fy-y0;
+    for(let x=0;x<w;x++){const fx=Math.min(lw-1.001,Math.max(0,(x+.5)/f-.5)),x0=fx|0,tx=fx-x0,i0=y0*lw+x0,p=(y*w+x)*4;let sw=0,r=0,g=0,b=0;
+      for(let k=0;k<n;k++){const m=Wm[k],wt=(m[i0]*(1-tx)+m[i0+1]*tx)*(1-ty)+(m[i0+lw]*(1-tx)+m[i0+lw+1]*tx)*ty,d=D[k];sw+=wt;r+=d[p]*wt;g+=d[p+1]*wt;b+=d[p+2]*wt}
+      o[p]=r/sw;o[p+1]=g/sw;o[p+2]=b/sw;o[p+3]=255}}
+  const c=document.createElement('canvas');c.width=w;c.height=h;c.getContext('2d').putImageData(new ImageData(o,w,h),0,0);return c}
+function localTone(c,a){ // HDR de una sola toma: levanta sombras y contiene luces suavemente
+  const w=c.width,h=c.height,x=c.getContext('2d'),im=x.getImageData(0,0,w,h),d=im.data,bl=lowpass(c,16,true);
+  for(let i=0,p=0;i<bl.length;i++,p+=4){const L=Math.max(bl[i],20)/255;let g=Math.pow(.5/L,.45*a);g=Math.min(1.7,Math.max(.8,g));d[p]*=g;d[p+1]*=g;d[p+2]*=g}
+  x.putImageData(im,0,0);return c}
+async function hdrShot(say){
+  const tr=stream.getVideoTracks()[0],cap=tr.getCapabilities&&tr.getCapabilities().exposureCompensation;
+  if(!cap||cap.max-cap.min<1.5){const c=await still();return localTone(c,.6)}
+  const evs=[-1,0,1].map(e=>Math.max(cap.min,Math.min(cap.max,e))),fr=[];
+  for(let i=0;i<3;i++){say(`HDR ${i+1}/3…`);await tr.applyConstraints({advanced:[{exposureCompensation:evs[i]}]}).catch(()=>{});await sleep(320);fr.push(toCanvas(v,PX_MULTI))}
+  await tr.applyConstraints({advanced:[{exposureCompensation:0}]}).catch(()=>{});
+  const rp=pyr(fr[1]);
+  return fuse(fr.map((c,i)=>{if(i===1)return c;const s=align(rp,pyr(c),c.width);return shift(c,s.dx,s.dy)}))}
+
+/* ---------- Revelado: color, nitidez y piel ---------- */
+function levels(c,night){ // estira histograma y levanta sombras (modo noche)
+  const x=c.getContext('2d'),w=c.width,h=c.height,im=x.getImageData(0,0,w,h),d=im.data,H=new Uint32Array(256);
+  for(let p=0;p<d.length;p+=4)H[(.299*d[p]+.587*d[p+1]+.114*d[p+2])|0]++;
+  const T=w*h;let a=0,lo=0,hi=255;for(let i=0;i<256;i++){a+=H[i];if(a>T*.005){lo=i;break}}a=0;for(let i=255;i>=0;i--){a+=H[i];if(a>T*.005){hi=i;break}}
+  const gain=night?Math.min(2.8,Math.max(1,225/Math.max(hi,40))):1,gm=night?.78:.92,L=new Uint8ClampedArray(256),bp=lo*.85;
+  for(let i=0;i<256;i++)L[i]=255*Math.pow(Math.max(0,Math.min(1,(i-bp)/(255-bp)*gain)),gm);
+  for(let p=0;p<d.length;p+=4){d[p]=L[d[p]];d[p+1]=L[d[p+1]];d[p+2]=L[d[p+2]]}
+  x.putImageData(im,0,0)}
+function finish(src,flat){
+  const w=src.width,h=src.height,n=w*h,front=facing==='user',c=document.createElement('canvas');c.width=w;c.height=h;
+  const x=c.getContext('2d');x.imageSmoothingQuality='high';
+  if(front&&S.mirS){x.translate(w,0);x.scale(-1,1)}
+  x.drawImage(src,0,0);x.setTransform(1,0,0,1,0,0);
+  const im=x.getImageData(0,0,w,h),d=im.data,ys=lowpass(c,3,true);
+  const sm=front?S.sm/100:0,bl=sm>0?lowpass(c,Math.max(4,Math.round(w/400)),false):null;
+  const k=flat?.22:.13,gam=front?.94:.97,L=new Uint8ClampedArray(256);
+  for(let i=0;i<256;i++){const t=i/255,sc=t*t*(3-2*t);L[i]=255*Math.pow(t*(1-k)+sc*k,gam)}
+  const vib=front?(S.iph?.26:.14):(S.iph?.36:.18),sh0=S.iph?1:.65;
+  for(let i=0,p=0;i<n;i++,p+=4){
+    const r0=d[p],g0=d[p+1],b0=d[p+2];let r=r0,g=g0,b=b0;
+    const mx0=Math.max(r0,g0,b0),mn0=Math.min(r0,g0,b0);
+    const skin=r0>80&&g0>35&&b0>20&&r0>g0&&r0>b0&&(r0-g0)>8&&(r0-b0)>16&&(r0-g0)<90&&mx0-mn0>15;
+    if(bl&&skin){const Y=(r0*77+g0*150+b0*29)>>8,Yb=(bl[p]*77+bl[p+1]*150+bl[p+2]*29)>>8,df=Y-Yb,dc=Math.abs(r0-bl[p])+Math.abs(g0-bl[p+1])+Math.abs(b0-bl[p+2]);
+      const a=sm*.9*Math.exp(-df*df/450-dc*dc/6000);r+=(bl[p]-r)*a;g+=(bl[p+1]-g)*a;b+=(bl[p+2]-b)*a}
+    const dt=((r0*77+g0*150+b0*29)>>8)-ys[i],ad=Math.abs(dt);let add=(skin?sh0*(1-.65*sm):sh0)*dt*(ad/(ad+3));add=add>45?45:add<-45?-45:add;
+    r+=add;g+=add;b+=add;
+    r=L[r<0?0:r>255?255:r|0];g=L[g<0?0:g>255?255:g|0];b=L[b<0?0:b>255?255:b|0];
+    const lum=(r*77+g*150+b*29)>>8,mx=Math.max(r,g,b),mn=Math.min(r,g,b),bo=1+vib*(1-(mx-mn)/(mx+1))*(skin?.35:1);
+    r=lum+(r-lum)*bo;g=lum+(g-lum)*bo;b=lum+(b-lum)*bo;
+    if(front&&skin){r*=1.015;b*=.985}
+    d[p]=r;d[p+1]=g;d[p+2]=b}
+  x.putImageData(im,0,0);return c}
+async function shoot(){
+  if(busy||!stream)return;busy=true;motionPerm();
+  const front=facing==='user',night=mode==='night',hint=$('hint'),say=t=>{hint.textContent=t;hint.style.display='block'};
+  if(S.timer){const cn=$('count');cn.style.display='flex';for(let i=S.timer;i>0;i--){cn.textContent=i;await sleep(1000)}cn.style.display='none'}
+  if(front&&S.sf&&(night||S.torch)){$('sflash').style.display='block';await sleep(250)}
+  try{
+    if(S.stab){say('Mantén firme…');await steady(night?2500:1600)}
+    let c,flat=false;
+    if(night){c=await nightShot(say);say('Procesando…');await sleep(30);levels(c,true)}
+    else if(S.hdr){c=await hdrShot(say);flat=true;say('Procesando…');await sleep(30)}
+    else{c=await bestShot(S.stab?3:1,say);say('Procesando…');await sleep(30)}
+    c=finish(c,flat);
+    const blob=await new Promise(r=>c.toBlob(r,'image/jpeg',S.q));
+    await add(blob,'image');
+  }catch(e){$('info').textContent='Error al procesar: '+e.message}
+  $('sflash').style.display='none';hint.style.display='none';busy=false}
+
+/* ---------- Video ---------- */
+function mime(){return['video/mp4;codecs=avc1','video/webm;codecs=vp9,opus','video/webm;codecs=vp8,opus','video/webm'].find(m=>window.MediaRecorder&&MediaRecorder.isTypeSupported(m))||''}
+function startRec(){chunks=[];
+  try{recorder=new MediaRecorder(stream,{mimeType:mime()||undefined,videoBitsPerSecond:25e6})}catch(e){$('info').textContent='Grabación no disponible';return}
+  recorder.ondataavailable=e=>e.data.size&&chunks.push(e.data);
+  recorder.onstop=()=>{add(new Blob(chunks,{type:recorder.mimeType||'video/webm'}),'video');recorder=null};
+  recorder.start(1000);t0=Date.now();$('rec').style.display='block';$('shutter').classList.add('recording');
+  timer=setInterval(()=>{const s=Math.floor((Date.now()-t0)/1e3);$('rec').textContent='● '+String(Math.floor(s/60)).padStart(2,'0')+':'+String(s%60).padStart(2,'0')},500)}
+function stopRec(){recorder.stop();clearInterval(timer);$('rec').style.display='none';$('shutter').classList.remove('recording')}
+$('shutter').onclick=()=>{if(!stream)return;if(mode==='video')recorder?stopRec():startRec();else shoot()};
+
+/* ---------- Almacenamiento (IndexedDB) ---------- */
+let db=null;
+function idb(){return new Promise(r=>{try{const q=indexedDB.open('camara-pro',1);q.onupgradeneeded=()=>q.result.createObjectStore('m',{keyPath:'id'});q.onsuccess=()=>{db=q.result;r()};q.onerror=()=>r()}catch(e){r()}})}
+const st=(m)=>db.transaction('m',m).objectStore('m');
+async function add(blob,type){const it={id:Date.now()+Math.random(),type,blob,ts:Date.now()};
+  try{if(db)st('readwrite').put(it)}catch(e){}
+  it.url=URL.createObjectURL(blob);items.unshift(it);refreshThumb()}
+async function load(){await idb();if(!db)return;
+  const all=await new Promise(r=>{const q=st('readonly').getAll();q.onsuccess=()=>r(q.result);q.onerror=()=>r([])});
+  all.sort((a,b)=>b.ts-a.ts);items=all.map(i=>({...i,url:URL.createObjectURL(i.blob)}));refreshThumb()}
+function refreshThumb(){const i=items.find(x=>x.type==='image');$('thumb').innerHTML=i?`<img src="${i.url}" alt="">`:'🖼'}
+
+/* ---------- Galería ---------- */
+function renderG(){$('grid').innerHTML=items.map((i,k)=>`<div class="it" data-k="${k}">${i.type==='image'?`<img src="${i.url}" alt="">`:`<video src="${i.url}" muted playsinline></video><span>▶</span>`}</div>`).join('')||'<p style="padding:16px;color:#aaa">Aún no hay capturas.</p>'}
+$('grid').onclick=e=>{const t=e.target.closest('.it');if(t)show(+t.dataset.k)};
+$('thumb').onclick=()=>{renderG();$('gal').style.display='flex'};$('gClose').onclick=()=>$('gal').style.display='none';
+function show(k){if(!items.length){$('view').style.display='none';renderG();return}
+  vi=(k+items.length)%items.length;const i=items[vi];delArm=false;$('vDel').textContent='🗑 Borrar';
+  $('vbody').innerHTML=i.type==='image'?`<img src="${i.url}" alt="">`:`<video src="${i.url}" controls playsinline autoplay></video>`;
+  $('vN').textContent=`${vi+1} / ${items.length}`;$('view').style.display='flex'}
+$('vBack').onclick=()=>{$('view').style.display='none';$('vbody').innerHTML='';renderG()};
+$('vPrev').onclick=()=>show(vi-1);$('vNext').onclick=()=>show(vi+1);
+$('vDel').onclick=()=>{if(!delArm){delArm=true;$('vDel').textContent='¿Seguro? Toca otra vez';$('vDel').style.background='#e5252a';setTimeout(()=>{delArm=false;$('vDel').textContent='🗑 Borrar';$('vDel').style.background=''},3000);return}
+  const i=items[vi];try{if(db)st('readwrite').delete(i.id)}catch(e){}URL.revokeObjectURL(i.url);items.splice(vi,1);$('vDel').style.background='';refreshThumb();show(Math.min(vi,items.length-1))};
+$('vSave').onclick=async()=>{const i=items[vi],ext=i.type==='image'?'jpg':(i.blob.type.includes('mp4')?'mp4':'webm'),f=new File([i.blob],`captura-${i.ts}.${ext}`,{type:i.blob.type});
+  try{if(navigator.canShare&&navigator.canShare({files:[f]})){await navigator.share({files:[f]});return}}catch(e){}
+  const a=document.createElement('a');a.href=i.url;a.download=f.name;document.body.appendChild(a);a.click();a.remove()};
+
+load();open();
+</script>
+</body>
+</html>
